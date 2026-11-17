@@ -1,0 +1,5 @@
+/** Client face typecheck: browser half only. */
+{
+  "extends": "./tsconfig.base.json",
+  "include": ["src/client/**/*.ts", "src/client/**/*.tsx", "src/client/css-modules.d.ts", "src/remote.ts"]
+}
