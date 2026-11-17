@@ -1,0 +1,4 @@
+src/
+build.mts
+build-client.mjs
+tsconfig*.json
