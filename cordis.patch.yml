@@ -1,0 +1,5 @@
+# dsh-skill-board bundle layer: the host service behind the sidebar board,
+# the per-session Skills view, and the skillBoard gateway namespace.
+- insert:
+    - id: skill-board
+      name: 'dsh-skill-board'
