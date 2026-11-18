@@ -7,7 +7,13 @@ await build({
   outDir: 'lib',
   clean: false,
   format: 'cjs',
-  externals: ['react', 'react/jsx-runtime', 'react-dom', 'react-dom/client', 'zod', 'clsx', /^@deepseek-ai\//],
+  // Everything outside this package is supplied by the shell's module table,
+  // except the Remote declaration factory: the browser table has no row for it,
+  // so it must be inlined (the official preset inlines it too).
+  deps: {
+    neverBundle: true,
+    alwaysBundle: [/^@deepseek-ai\/dsh-typert-protocol\//, 'clsx'],
+  },
 })
 
 let code = await readFile('lib/client.cjs', 'utf8')

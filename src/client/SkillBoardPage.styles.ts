@@ -4,6 +4,7 @@ export const css = {
   'boardMeta': 'sb-page-boardMeta',
   'boardMetaHidden': 'sb-page-boardMetaHidden',
   'card': 'sb-page-card',
+  'cardOpen': 'sb-page-cardOpen',
   'cardDescription': 'sb-page-cardDescription',
   'cardDisabled': 'sb-page-cardDisabled',
   'cardMain': 'sb-page-cardMain',
@@ -43,7 +44,30 @@ export const css = {
   'statTime': 'sb-page-statTime',
   'tile': 'sb-page-tile',
 }
-export const cssText = `/* Skill board page: layout, cards, and states on --dsw-* semantic tokens. */
+export const cssText = `
+/* Clickable identity region of a card; the stats and switch stay outside it. */
+.sb-page-cardOpen {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex: 1;
+  min-width: 0;
+  margin: 0;
+  padding: 0;
+  border: none;
+  background: none;
+  text-align: start;
+  cursor: pointer;
+  color: inherit;
+  font: inherit;
+}
+
+.sb-page-cardOpen:focus-visible {
+  outline: 2px solid var(--dsw-alias-link);
+  outline-offset: 2px;
+  border-radius: var(--dsw-radius-md);
+}
+/* Skill board page: layout, cards, and states on --dsw-* semantic tokens. */
 
 .sb-page-page {
   display: flex;

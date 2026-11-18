@@ -12,6 +12,9 @@ import {
 } from '@deepseek-ai/dsh-client-ui-primitives'
 import { IconSparkleRegular, relativeTime } from '@deepseek-ai/dsh-client-ui-primitives'
 import { StatCard, TopSkillsBars, UsageDonut } from './charts.tsx'
+import { SkillDetailDialog } from './SkillDetail.tsx'
+import { cssText as detailCss } from './SkillDetail.styles.ts'
+import type { SkillBoardDetail } from '../remote.ts'
 import type { InjectFace, PropsLocale, PropsStore, PropsRuntime } from '@deepseek-ai/dsh-client-ui-slots'
 import type { BoardSource, BoardSnapshot } from './board-source.ts'
 import type { BoardFilter, BoardViewState } from './board-store.ts'
@@ -28,6 +31,8 @@ export interface SkillBoardInjected {
   readonly setDisabled: (name: string, disabled: boolean) => void
   /** Toggle one skill's global default from the global view. */
   readonly setGlobalDisabled: (name: string, disabled: boolean) => void
+  /** Read one skill's full detail. */
+  readonly readDetail: (name: string) => Promise<SkillBoardDetail | undefined>
   /** Clear global invocation counters on the host. */
   readonly reset: () => void
 }
@@ -85,12 +90,34 @@ function sessionLabel(session: SkillBoardSession, t: (key: SkillBoardKey, params
  * @returns the assembled page.
  */
 export function SkillBoardPage(props: SkillBoardPageProps): ReactNode {
-  const { t, useBoard, load, setDisabled, setGlobalDisabled, reset, useStore, actions } = props
+  const { t, useBoard, load, setDisabled, setGlobalDisabled, readDetail, reset, useStore, actions } = props
   const board = useBoard((snapshot: BoardSnapshot) => snapshot)
   const query = useStore((state: BoardViewState) => state.query)
   const filter = useStore((state: BoardViewState) => state.filter)
   const [pickerOpen, setPickerOpen] = useState(false)
   const [resetOpen, setResetOpen] = useState(false)
+  const [detailName, setDetailName] = useState<string | undefined>(undefined)
+  const [detail, setDetail] = useState<SkillBoardDetail | undefined>(undefined)
+  const [detailFailed, setDetailFailed] = useState(false)
+  const [detailLoading, setDetailLoading] = useState(false)
+
+  const openDetail = (name: string): void => {
+    setDetailName(name)
+    setDetail(undefined)
+    setDetailFailed(false)
+    setDetailLoading(true)
+    void readDetail(name).then(value => {
+      setDetail(value)
+      setDetailFailed(value === undefined)
+      setDetailLoading(false)
+    })
+  }
+  const closeDetail = (): void => {
+    setDetailName(undefined)
+    setDetail(undefined)
+    setDetailFailed(false)
+    setDetailLoading(false)
+  }
   const now = Date.now()
   const perSession = board.sessionId !== ''
 
@@ -267,10 +294,20 @@ export function SkillBoardPage(props: SkillBoardPageProps): ReactNode {
                   if (perSession) setDisabled(row.name, next)
                   else setGlobalDisabled(row.name, next)
                 }}
+                onOpen={() => { openDetail(row.name) }}
               />
             ))}
           </ul>
         )}
+
+        <SkillDetailDialog
+          detail={detail}
+          loading={detailLoading}
+          failed={detailFailed}
+          onClose={closeDetail}
+          onRetry={() => { if (detailName !== undefined) openDetail(detailName) }}
+          t={t}
+        />
 
         <Modal
           open={resetOpen}
@@ -292,21 +329,23 @@ export function SkillBoardPage(props: SkillBoardPageProps): ReactNode {
 }
 
 /** One skill card row: identity and toggle on the left, usage stats on the right. */
-function SkillCard({ row, now, perSession, canToggle, t, onToggle }: {
+function SkillCard({ row, now, perSession, canToggle, t, onToggle, onOpen }: {
   row: SkillBoardRow
   now: number
   perSession: boolean
   canToggle: boolean
   t: SkillBoardPageProps['t']
   onToggle: (next: boolean) => void
+  onOpen: () => void
 }): ReactNode {
   const calls = perSession ? row.sessionCalls : row.totalCalls
   const lastAt = perSession ? row.sessionLastCalledAt : row.lastCalledAt
   const lastLabel = lastAt > 0 ? relativeLabel(lastAt, now, t) : ''
   return (
     <li className={clsx(css.card, row.disabled && css.cardDisabled)}>
-      <div className={css.tile}><IconSparkleRegular size={18} /></div>
-      <div className={css.cardMain}>
+      <button type="button" className={css.cardOpen} onClick={onOpen} aria-label={t('action.detail')}>
+        <div className={css.tile}><IconSparkleRegular size={18} /></div>
+        <div className={css.cardMain}>
         <div className={css.cardTitleRow}>
           <span className={clsx(css.cardName, row.disabled && css.cardNameDisabled)}>{row.name}</span>
           {row.sessionOverride === 'enabled' && <Tag tone="info">{t('stat.overrideEnabled')}</Tag>}
@@ -326,8 +365,9 @@ function SkillCard({ row, now, perSession, canToggle, t, onToggle }: {
             </Tooltip>
           )}
         </div>
-        {row.description !== '' && <p className={css.cardDescription}>{row.description}</p>}
-      </div>
+          {row.description !== '' && <p className={css.cardDescription}>{row.description}</p>}
+        </div>
+      </button>
       <div className={clsx(css.statBlock, calls === 0 && css.statBlockIdle)}>
         <span className={css.statNumber}>{calls}</span>
         <span className={css.statLabel}>{t('stat.callsUnit')}</span>

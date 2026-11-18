@@ -3,12 +3,16 @@
  * open session. Registered beside the trajectory view tab.
  */
 
-import { useEffect, useMemo, useRef } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import type { ReactNode } from 'react'
 import clsx from 'clsx'
 import { Switch, Tag, Tooltip } from '@deepseek-ai/dsh-client-ui-primitives'
 import type { InjectFace, PropsLocale, PropsRuntime } from '@deepseek-ai/dsh-client-ui-slots'
+// Brings the session standard props (sessionId and friends) into the program.
+import type {} from '@deepseek-ai/dsh-client-ui-session/client'
 import { StatCard, TopSkillsBars, UsageDonut } from './charts.tsx'
+import { SkillDetailDialog } from './SkillDetail.tsx'
+import type { SkillBoardDetail } from '../remote.ts'
 import type { BoardSource, BoardSnapshot } from './board-source.ts'
 import type { SkillBoardRow } from '../remote.ts'
 import type { SkillBoardKey } from './locales.ts'
@@ -18,6 +22,7 @@ import { css } from './SessionSkillBoard.styles'
 export interface SessionBoardInjected {
   readonly toggle: (name: string, disabled: boolean) => void
   readonly reload: () => void
+  readonly readDetail: (name: string) => Promise<SkillBoardDetail | undefined>
 }
 
 /** Full props of the session skill view. */
@@ -32,10 +37,33 @@ export type SessionSkillBoardProps =
  * @returns the assembled view.
  */
 export function SessionSkillBoard(props: SessionSkillBoardProps): ReactNode {
-  const { t, useBoard, toggle, reload, sessionId } = props
+  const { t, useBoard, toggle, reload, readDetail } = props
+  const sessionId = props.sessionId
   const board = useBoard((snapshot: BoardSnapshot) => snapshot)
   const live = board.sessionLive
   const viewRef = useRef<HTMLDivElement>(null)
+  const [detail, setDetail] = useState<SkillBoardDetail | undefined>(undefined)
+  const [detailName, setDetailName] = useState<string | undefined>(undefined)
+  const [detailLoading, setDetailLoading] = useState(false)
+  const [detailFailed, setDetailFailed] = useState(false)
+
+  const openDetail = (name: string): void => {
+    setDetailName(name)
+    setDetail(undefined)
+    setDetailFailed(false)
+    setDetailLoading(true)
+    void readDetail(name).then(value => {
+      setDetail(value)
+      setDetailFailed(value === undefined)
+      setDetailLoading(false)
+    })
+  }
+  const closeDetail = (): void => {
+    setDetailName(undefined)
+    setDetail(undefined)
+    setDetailFailed(false)
+    setDetailLoading(false)
+  }
 
   // A conversation's scroll body rests at the bottom (newest message); this
   // view inherits that position when it mounts. Reset our own scroller and
@@ -111,24 +139,43 @@ export function SessionSkillBoard(props: SessionSkillBoardProps): ReactNode {
         <p className={css.sectionTitle}>{t('chart.manage')}</p>
         <ul className={css.rows}>
           {board.rows.map(row => (
-            <SkillToggleRow key={row.name} row={row} t={t} canToggle={live} onToggle={toggle} />
+            <SkillToggleRow
+              key={row.name}
+              row={row}
+              t={t}
+              canToggle={live}
+              onToggle={toggle}
+              onOpen={() => { openDetail(row.name) }}
+            />
           ))}
         </ul>
       </div>
+
+      <SkillDetailDialog
+        detail={detail}
+        loading={detailLoading}
+        failed={detailFailed}
+        onClose={closeDetail}
+        onRetry={() => { if (detailName !== undefined) openDetail(detailName) }}
+        t={t}
+      />
     </div>
   )
 }
 
 /** One compact skill row with its session switch. */
-function SkillToggleRow({ row, t, canToggle, onToggle }: {
+function SkillToggleRow({ row, t, canToggle, onToggle, onOpen }: {
   row: SkillBoardRow
   t: (key: SkillBoardKey, params?: Record<string, string>) => string
   canToggle: boolean
   onToggle: (name: string, disabled: boolean) => void
+  onOpen: () => void
 }): ReactNode {
   return (
     <li className={clsx(css.row, row.disabled && css.rowDisabled)}>
-      <span className={clsx(css.rowName, row.disabled && css.rowNameDisabled)} title={row.description}>{row.name}</span>
+      <button type="button" className={css.rowOpen} onClick={onOpen} aria-label={t('action.detail')}>
+        <span className={clsx(css.rowName, row.disabled && css.rowNameDisabled)}>{row.name}</span>
+      </button>
       <Tag tone="quiet">{row.sources[0] ?? ''}</Tag>
       {row.sessionOverride === 'enabled' && <Tag tone="info">{t('stat.overrideEnabled')}</Tag>}
       {row.disabled && (

@@ -6,7 +6,7 @@
  */
 
 import type { HostObservable } from '@deepseek-ai/dsh-client-ui-slots'
-import type { SkillBoardCatalog, SkillBoardRow, SkillBoardSession } from '../remote.ts'
+import type { SkillBoardCatalog, SkillBoardDetail, SkillBoardRow, SkillBoardSession } from '../remote.ts'
 
 /** Board read state. */
 export type BoardStatus = 'loading' | 'ready' | 'error'
@@ -29,6 +29,7 @@ export interface SkillBoardApi {
   catalog(request: { sessionId?: string }): Promise<{ ok: boolean, value?: SkillBoardCatalog, error?: unknown }>
   setDisabled(request: { sessionId: string, name: string, disabled: boolean }): Promise<{ ok: boolean, value?: SkillBoardCatalog, error?: unknown }>
   setGlobalDisabled(request: { name: string, disabled: boolean }): Promise<{ ok: boolean, value?: SkillBoardCatalog, error?: unknown }>
+  detail(request: { name: string, sessionId?: string }): Promise<{ ok: boolean, value?: SkillBoardDetail, error?: unknown }>
   reset(): Promise<{ ok: boolean, value?: SkillBoardCatalog, error?: unknown }>
 }
 
@@ -72,6 +73,17 @@ export class BoardSource implements HostObservable<BoardSnapshot> {
   /** Toggle one skill's global default from the global view. */
   setGlobalDisabled(name: string, disabled: boolean): void {
     void this.read(this.api.setGlobalDisabled({ name, disabled }))
+  }
+
+  /**
+   * Read one skill's detail for the dialog.
+   * @param name - skill name.
+   * @returns the detail, or undefined when the read failed.
+   */
+  async detail(name: string): Promise<SkillBoardDetail | undefined> {
+    const sessionId = this.snapshot.sessionId
+    const result = await this.api.detail(sessionId === '' ? { name } : { name, sessionId })
+    return result.ok ? result.value : undefined
   }
 
   /** Clear counters on the host and adopt the returned fresh catalog. */

@@ -30,7 +30,7 @@ import type {} from '@deepseek-ai/dsh-tools'
 import { Remote, TypertRemoteService } from '@deepseek-ai/dsh-typert-protocol'
 import z from '@deepseek-ai/schemastery'
 import { z as zod } from 'zod'
-import type { SkillBoardCatalog, SkillBoardRow, SkillBoardSession } from './remote.ts'
+import type { SkillBoardCatalog, SkillBoardDetail, SkillBoardRow, SkillBoardSession } from './remote.ts'
 
 /** One invocation counter row (storage-domain). */
 interface SkillStatRecord {
@@ -223,6 +223,53 @@ export class SkillBoardService extends TypertRemoteService {
     await domain.global.set({ ...current, disabled: [...names].sort() })
     for (const agent of this.ctx.agents.list()) await this.syncShadows(agent.id)
     return this.catalog({})
+  }
+
+  /**
+   * Read one skill's complete detail for the board's detail dialog.
+   * @param request - skill name and the session whose usage is reported.
+   * @returns routing metadata, source path, invocation policy, usage and body.
+   */
+  @Remote('detail')
+  async detail(request: { name: string, sessionId?: string }): Promise<SkillBoardDetail> {
+    const sessionId = request.sessionId ?? ''
+    const lived = sessionId === '' ? undefined : this.ctx.agents.get(sessionId as SessionId)
+    const options = lived !== undefined
+      ? { scope: lived, cwd: lived.session.header.cwd }
+      : { cwd: process.cwd() }
+    const summary = (await this.ctx.skills.list(options)).find(skill => skill.name === request.name)
+    if (summary === undefined) {
+      throw new Error(`skillBoard: skill "${request.name}" is not mounted in this view`)
+    }
+    const definition = await this.ctx.skills.get(request.name, options)
+    const globalDisabled = new Set(await this.globalDisabledOf())
+    const overrides = sessionId === '' ? { sessionId } : await this.overridesOf(sessionId)
+    const fold = lived === undefined ? { calls: new Map() } : foldSessionSkills(lived.session.snapshotEvents())
+    const folded = fold.calls.get(request.name)
+    const stat = (await this.domain).table('stats').get(request.name)
+    const override: 'none' | 'enabled' | 'disabled'
+      = (overrides.enabled ?? []).includes(request.name) ? 'enabled'
+        : (overrides.disabled ?? []).includes(request.name) ? 'disabled'
+          : 'none'
+    return {
+      name: summary.name,
+      description: summary.description,
+      whenToUse: summary.whenToUse ?? '',
+      source: summary.source,
+      provider: summary.provider,
+      path: summary.path ?? '',
+      modelInvocable: summary.invocation.modelInvocable,
+      userInvocable: summary.invocation.userInvocable,
+      disabled: sessionId === '' ? globalDisabled.has(request.name) : this.effectiveDisabled(request.name, globalDisabled, overrides),
+      sessionOverride: sessionId === '' ? 'none' : override,
+      globalDisabled: globalDisabled.has(request.name),
+      sessionCalls: folded?.total ?? 0,
+      sessionErrors: folded?.errors ?? 0,
+      sessionLastCalledAt: folded?.lastAt ?? 0,
+      totalCalls: stat?.totalCalls ?? 0,
+      lastCalledAt: stat?.lastCalledAt ?? 0,
+      content: definition?.content ?? '',
+    }
   }
 
   /**

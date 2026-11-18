@@ -21,6 +21,7 @@ import { createBoardStore } from './board-store.ts'
 import { en, NS, zh, type SkillBoardKey } from './locales.ts'
 import { SkillPanelIcon } from './SkillPanelIcon.tsx'
 import { SkillBoardPage } from './SkillBoardPage.tsx'
+import { cssText as detailCss } from './SkillDetail.styles.ts'
 import { cssText as pageCss } from './SkillBoardPage.styles.ts'
 import { cssText as sessionCss } from './SessionSkillBoard.styles.ts'
 import { cssText as chartsCss } from './charts.styles.ts'
@@ -49,7 +50,7 @@ function injectStyles(): void {
   if (document.getElementById(marker) !== null) return
   const style = document.createElement('style')
   style.id = marker
-  style.textContent = [chartsCss, sessionCss, pageCss].join('\n')
+  style.textContent = [chartsCss, sessionCss, pageCss, detailCss].join('\n')
   document.head.appendChild(style)
 }
 
@@ -74,6 +75,7 @@ export function apply(ctx: ClientContext): void {
           load: (sessionId?: string) => source.load(sessionId),
           setDisabled: (name: string, disabled: boolean) => source.setDisabled(name, disabled),
           setGlobalDisabled: (name: string, disabled: boolean) => source.setGlobalDisabled(name, disabled),
+          readDetail: (name: string) => source.detail(name),
           reset: () => source.reset(),
           hooks: { board: source },
         }),
@@ -98,6 +100,7 @@ export function apply(ctx: ClientContext): void {
           return {
             toggle: (name: string, disabled: boolean) => { source?.setDisabled(name, disabled) },
             reload: () => { source?.load(sessionId) },
+            readDetail: (name: string) => source === undefined ? Promise.resolve(undefined) : source.detail(name),
             hooks: { board: source },
           }
         },

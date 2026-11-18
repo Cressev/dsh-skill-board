@@ -33,6 +33,28 @@ export interface SkillBoardRow {
   readonly lastCalledAt: number
 }
 
+/** One skill's complete detail, loaded on demand from the registry. */
+export interface SkillBoardDetail {
+  readonly name: string
+  readonly description: string
+  readonly whenToUse: string
+  readonly source: string
+  readonly provider: string
+  readonly path: string
+  readonly modelInvocable: boolean
+  readonly userInvocable: boolean
+  readonly disabled: boolean
+  readonly sessionOverride: 'none' | 'enabled' | 'disabled'
+  readonly globalDisabled: boolean
+  readonly sessionCalls: number
+  readonly sessionErrors: number
+  readonly sessionLastCalledAt: number
+  readonly totalCalls: number
+  readonly lastCalledAt: number
+  /** The skill's instruction body (its SKILL.md content). */
+  readonly content: string
+}
+
 /** Whole board snapshot for one selected session (or the global view). */
 export interface SkillBoardCatalog {
   readonly sessionId: string
@@ -51,6 +73,7 @@ declare module '@deepseek-ai/dsh-typert-protocol' {
       sessions(): Promise<RemoteResult<{ sessions: readonly SkillBoardSession[] }>>
       setDisabled(sessionId: string, name: string, disabled: boolean): Promise<RemoteResult<SkillBoardCatalog>>
       setGlobalDisabled(name: string, disabled: boolean): Promise<RemoteResult<SkillBoardCatalog>>
+      detail(request: { name: string, sessionId?: string }): Promise<RemoteResult<SkillBoardDetail>>
       reset(): Promise<RemoteResult<SkillBoardCatalog>>
     }
   }
@@ -78,6 +101,44 @@ const rowSchema = z.object({
   totalCalls: z.number(),
   lastCalledAt: z.number(),
 })
+
+const detailSchema = z.object({
+  name: z.string(),
+  description: z.string(),
+  whenToUse: z.string(),
+  source: z.string(),
+  provider: z.string(),
+  path: z.string(),
+  modelInvocable: z.boolean(),
+  userInvocable: z.boolean(),
+  disabled: z.boolean(),
+  sessionOverride: z.enum(['none', 'enabled', 'disabled']),
+  globalDisabled: z.boolean(),
+  sessionCalls: z.number(),
+  sessionErrors: z.number(),
+  sessionLastCalledAt: z.number(),
+  totalCalls: z.number(),
+  lastCalledAt: z.number(),
+  content: z.string(),
+})
+
+const detailJson = {
+  type: 'object',
+  properties: {
+    name: { type: 'string' }, description: { type: 'string' }, whenToUse: { type: 'string' },
+    source: { type: 'string' }, provider: { type: 'string' }, path: { type: 'string' },
+    modelInvocable: { type: 'boolean' }, userInvocable: { type: 'boolean' },
+    disabled: { type: 'boolean' }, globalDisabled: { type: 'boolean' },
+    sessionOverride: { type: 'string', enum: ['none', 'enabled', 'disabled'] },
+    sessionCalls: { type: 'number' }, sessionErrors: { type: 'number' },
+    sessionLastCalledAt: { type: 'number' }, totalCalls: { type: 'number' },
+    lastCalledAt: { type: 'number' }, content: { type: 'string' },
+  },
+  required: ['name', 'description', 'whenToUse', 'source', 'provider', 'path', 'modelInvocable',
+    'userInvocable', 'disabled', 'sessionOverride', 'globalDisabled', 'sessionCalls',
+    'sessionErrors', 'sessionLastCalledAt', 'totalCalls', 'lastCalledAt', 'content'],
+  additionalProperties: true,
+} as const
 
 const catalogSchema = z.object({
   sessionId: z.string(),
@@ -145,6 +206,21 @@ export const skillBoardRemote = createTypertRemoteInfo({
         },
       ],
       result: { mode: 'strict', typeSymbol: 'skill-board-plugin/remote#SkillBoardCatalog', create: () => catalogSchema, description: 'The global catalog after the change.', jsonSchema: catalogJson },
+    },
+    'skillBoard/detail': {
+      service: 'skillBoard',
+      description: 'Read one skill\'s full detail: routing description, source path, invocation policy, usage and instruction body.',
+      invocation: { kind: 'direct' },
+      parameters: [
+        {
+          name: 'request',
+          description: 'Skill name and the session whose usage should be reported.',
+          source: 'json',
+          codec: { mode: 'strict', typeSymbol: 'skill-board-plugin/remote#DetailRequest', create: () => z.object({ name: z.string(), sessionId: z.string().optional() }), jsonSchema: { type: 'object', properties: { name: { type: 'string' }, sessionId: { type: 'string' } }, required: ['name'], additionalProperties: false } as const },
+          strictCodec: { mode: 'strict', typeSymbol: 'skill-board-plugin/remote#DetailRequest', create: () => z.object({ name: z.string(), sessionId: z.string().optional() }), jsonSchema: { type: 'object', properties: { name: { type: 'string' }, sessionId: { type: 'string' } }, required: ['name'], additionalProperties: false } as const },
+        },
+      ],
+      result: { mode: 'strict', typeSymbol: 'skill-board-plugin/remote#SkillBoardDetail', create: () => detailSchema, description: 'The skill detail.', jsonSchema: detailJson },
     },
     'skillBoard/reset': {
       service: 'skillBoard',

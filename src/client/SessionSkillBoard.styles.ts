@@ -8,6 +8,7 @@ export const css = {
   'noticeAction': 'sb-session-noticeAction',
   'row': 'sb-session-row',
   'rowCalls': 'sb-session-rowCalls',
+  'rowOpen': 'sb-session-rowOpen',
   'rowCallsMuted': 'sb-session-rowCallsMuted',
   'rowDisabled': 'sb-session-rowDisabled',
   'rowName': 'sb-session-rowName',
@@ -18,7 +19,29 @@ export const css = {
   'statRow': 'sb-session-statRow',
   'view': 'sb-session-view',
 }
-export const cssText = `/* The per-session Skill view: stat row, charts, and manage rows. */
+export const cssText = `
+/* Clickable name region of a manage row. */
+.sb-session-rowOpen {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+  margin: 0;
+  padding: 0;
+  border: none;
+  background: none;
+  text-align: start;
+  cursor: pointer;
+  color: inherit;
+  font: inherit;
+}
+
+.sb-session-rowOpen:focus-visible {
+  outline: 2px solid var(--dsw-alias-link);
+  outline-offset: 2px;
+  border-radius: var(--dsw-radius-sm);
+}
+/* The per-session Skill view: stat row, charts, and manage rows. */
 
 .sb-session-view {
   display: flex;

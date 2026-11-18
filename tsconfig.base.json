@@ -1,7 +1,7 @@
 /** Shared compiler options for both plugin faces. */
 {
   "compilerOptions": {
-    "experimentalDecorators": true,
+    "experimentalDecorators": false,
     "target": "es2024",
     "module": "esnext",
     "moduleResolution": "bundler",

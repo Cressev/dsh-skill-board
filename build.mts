@@ -58,7 +58,8 @@ if (only !== 'client') {
     target: 'es2024',
     dts: { resolve: false },
     clean: false,
-    externals: nodeExternals,
+    // 0.23 deprecated `externals`; neverBundle keeps npm packages out of the bundle.
+    deps: { neverBundle: true },
   })
 }
 
